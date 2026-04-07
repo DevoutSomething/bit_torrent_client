@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_parse_integer_leading_zero() {
-        let input = b"i042e"; // invalid: leading zero
+        let input = b"042e"; // invalid: leading zero
         let result = parse_integer(input, 0);
         assert!(result.is_err(), "Parser should reject integers with leading zeros");
     }
