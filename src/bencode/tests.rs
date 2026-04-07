@@ -117,8 +117,14 @@ mod tests {
 
     #[test]
     fn test_parse_integer_leading_zero() {
-        let input = b"042e"; // invalid: leading zero
+        let input = b"042e"; // leading zero is allowed in bencode
         let result = parse_integer(input, 0);
-        assert!(result.is_err(), "Parser should reject integers with leading zeros");
+        assert!(result.is_ok());
+        let (bencode, index) = result.unwrap();
+        assert_eq!(index, 4);
+        match bencode {
+            Bencode::Integer(n) => assert_eq!(n, 42),
+            _ => panic!("Expected Integer"),
+        }
     }
 }           
