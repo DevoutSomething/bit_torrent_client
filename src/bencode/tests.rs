@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use crate::bencode::parser::{parse_integer, parse_string};
+    use crate::bencode::parser::{parse_integer, parse_string, parse_list, parse_dictionary};
+    use crate::bencode::encode::encode;
     use crate::bencode::types::Bencode;
 
     #[test]
@@ -127,4 +128,165 @@ mod tests {
             _ => panic!("Expected Integer"),
         }
     }
+
+    #[test]
+fn test_parse_dictionary_empty() {
+    let input = b"de";
+    let result = parse_dictionary(input, 0);
+
+    assert!(result.is_ok());
+    let (bencode, index) = result.unwrap();
+
+    assert_eq!(index, 2);
+
+    match bencode {
+        Bencode::Dictionary(map) => assert!(map.is_empty()),
+        _ => panic!("Expected Dictionary"),
+    }
+}
+
+#[test]
+fn test_parse_dictionary_simple() {
+    let input = b"d3:cow3:mooe";
+    let result = parse_dictionary(input, 0);
+
+    assert!(result.is_ok());
+    let (bencode, _) = result.unwrap();
+
+    match bencode {
+        Bencode::Dictionary(map) => {
+            let value = map.get(&b"cow".to_vec()).unwrap();
+
+            match value {
+                Bencode::String(s) => assert_eq!(s, b"moo"),
+                _ => panic!("Expected String"),
+            }
+        }
+        _ => panic!("Expected Dictionary"),
+    }
+}
+
+#[test]
+fn test_parse_dictionary_multiple_pairs() {
+    let input = b"d3:bar4:spam3:fooi42ee";
+    let result = parse_dictionary(input, 0);
+
+    assert!(result.is_ok());
+    let (bencode, _) = result.unwrap();
+
+    match bencode {
+        Bencode::Dictionary(map) => {
+            assert_eq!(map.len(), 2);
+
+            match map.get(&b"foo".to_vec()).unwrap() {
+                Bencode::Integer(n) => assert_eq!(*n, 42),
+                _ => panic!("Expected Integer"),
+            }
+        }
+        _ => panic!("Expected Dictionary"),
+    }
+}
+
+#[test]
+fn test_parse_list_empty() {
+    let input = b"le";
+    let result = parse_list(input, 0);
+
+    assert!(result.is_ok());
+    let (bencode, index) = result.unwrap();
+
+    assert_eq!(index, 2);
+
+    match bencode {
+        Bencode::List(v) => assert!(v.is_empty()),
+        _ => panic!("Expected List"),
+    }
+}
+
+#[test]
+fn test_parse_list_integers() {
+    let input = b"li1ei2ei3ee";
+    let result = parse_list(input, 0);
+
+    assert!(result.is_ok());
+    let (bencode, index) = result.unwrap();
+
+    assert_eq!(index, input.len());
+
+    match bencode {
+        Bencode::List(v) => {
+            assert_eq!(v.len(), 3);
+
+            match &v[0] {
+                Bencode::Integer(n) => assert_eq!(*n, 1),
+                _ => panic!("Expected Integer"),
+            }
+        }
+        _ => panic!("Expected List"),
+    }
+}
+
+#[test]
+fn test_parse_list_strings() {
+    let input = b"l3:foo3:bare";
+    let result = parse_list(input, 0);
+
+    assert!(result.is_ok());
+    let (bencode, _) = result.unwrap();
+
+    match bencode {
+        Bencode::List(v) => {
+            assert_eq!(v.len(), 2);
+
+            match &v[0] {
+                Bencode::String(s) => assert_eq!(s, b"foo"),
+                _ => panic!("Expected String"),
+            }
+        }
+        _ => panic!("Expected List"),
+    }
+}
+
+#[test]
+fn test_encode_dictionary() {
+    let mut dict = std::collections::HashMap::new();
+    dict.insert(b"cow".to_vec(), Bencode::String(b"moo".to_vec()));
+    let bencode = Bencode::Dictionary(dict);
+    let encoded = encode(&bencode);
+    assert_eq!(encoded, b"d3:cow3:mooe");
+}
+
+#[test]
+fn test_encode_integer() {
+    let bencode = Bencode::Integer(42);
+    let encoded = encode(&bencode);
+    assert_eq!(encoded, b"i42e");
+}
+
+#[test]
+fn test_encode_string() {
+    let bencode = Bencode::String(b"hello".to_vec());
+    let encoded = encode(&bencode);
+    assert_eq!(encoded, b"5:hello");
+}
+
+#[test]
+fn test_encode_list() {
+    let list = vec![Bencode::Integer(1), Bencode::Integer(2), Bencode::Integer(3)];
+    let bencode = Bencode::List(list);
+    let encoded = encode(&bencode);
+    assert_eq!(encoded, b"li1ei2ei3ee");
+}
+
+#[test]
+fn test_encode_complex_dictionary() {
+    let mut dict = std::collections::HashMap::new();
+    dict.insert(b"bar".to_vec(), Bencode::String(b"spam".to_vec()));
+    dict.insert(b"foo".to_vec(), Bencode::Integer(42));
+    let bencode = Bencode::Dictionary(dict);
+    let encoded = encode(&bencode);
+    // Dictionaries are sorted by key
+    assert_eq!(encoded, b"d3:bar4:spam3:fooi42ee");
+}
 }           
+

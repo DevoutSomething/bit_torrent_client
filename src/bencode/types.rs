@@ -5,5 +5,5 @@ pub enum Bencode {
     Integer(i64),
     String(Vec<u8>),
     List(Vec<Bencode>),
-    Dictionary(HashMap<String, Bencode>),
+    Dictionary(HashMap<Vec<u8>, Bencode>),
 }

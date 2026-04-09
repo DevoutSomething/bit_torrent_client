@@ -1,4 +1,5 @@
 use crate::bencode::types::Bencode;
+use std::collections::HashMap;
 
 fn parse_data(input: &[u8], index: usize) -> Result<(Bencode, usize), String> {
     if input.is_empty() {
@@ -8,6 +9,8 @@ fn parse_data(input: &[u8], index: usize) -> Result<(Bencode, usize), String> {
     match input[index] {
         b'i' => parse_integer(input, index + 1),
         b'0'..=b'9' => parse_string(input, index),
+        b'l' => parse_list(input, index),
+        b'd' => parse_dictionary(input, index),
         _ => Err("Invalid Bencode format".to_string()),
     }
 }
@@ -49,3 +52,37 @@ pub fn parse_string(input: &[u8], index: usize) -> Result<(Bencode, usize), Stri
     let string_result = input[start_index..end_index].to_vec();
     Ok((Bencode::String(string_result), end_index))
 }
+
+pub fn parse_list(input: &[u8], index: usize) -> Result<(Bencode, usize), String> { 
+   let mut return_list = Vec::new();
+   let mut current_index = index + 1;
+   while current_index < input.len() && input[current_index] != b'e' { 
+        let (bencode, next_index) = parse_data(input, current_index)?;
+        return_list.push(bencode);
+        current_index = next_index;
+    }
+    if current_index >= input.len() {
+        return Err("Unexpected end of input while parsing list".to_string());
+    }
+    Ok((Bencode::List(return_list), current_index + 1))
+   }
+
+   pub fn parse_dictionary(input: &[u8], index: usize) -> Result<(Bencode, usize), String> { 
+    let mut return_dictionary = HashMap::new();
+    let mut current_index = index + 1;
+    while current_index < input.len() && input[current_index] != b'e' {
+        let (key_bencode, next_index) = parse_string(input, current_index)?;
+        let key = match key_bencode {
+            Bencode::String(s) => s,
+            _ => return Err("Expected string as dictionary key".to_string()),
+        };
+        current_index = next_index;
+        let (value_bencode, next_index) = parse_data(input, current_index)?;
+        return_dictionary.insert(key, value_bencode);
+        current_index = next_index;
+    }
+    if current_index >= input.len() {
+        return Err("Unexpected end of input while parsing dictionary".to_string());
+    }
+    Ok((Bencode::Dictionary(return_dictionary), current_index + 1))
+   }
